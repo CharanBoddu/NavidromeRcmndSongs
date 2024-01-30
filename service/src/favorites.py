@@ -9,33 +9,34 @@ def login():
     try:
         payload = request.get_json()
         navidrome_server_url = payload.get('navidrome_server_url')
-        username = payload.get('username')
-        password = payload.get('password')
+        username = payload.get('navidrome_username')
+        password = payload.get('navidrome_password')
 
         auth_tokens = auth_and_capture_headers(navidrome_server_url, username, password)
 
         if auth_tokens:
-            return jsonify({'sucess': True, 'message': 'Authentication succesful'})
+            return jsonify({'success': True, 'message': 'Authentication succesful'})
         else:
             return jsonify({'success': False, 'message': 'Authentication failed'})
         
     except Exception as e:
-        return jsonify({'sucess': False,  'message': f'Error during authentication: {str(e)}'})
+        return jsonify({'success': False,  'message': f'Error during authentication: {str(e)}'})
 
-@app.route('/songs', methods=['GET'])
+@app.route('/songs', methods=['POST'])
 def recommend_songs():
-    navidrome_server_url = request.args.get("navidrome_server_url")
-    navidrome_username = request.args.get("navidrome_username")
-    navidrome_password = request.args.get("navidrome_password")
-    lastfm_token = request.args.get("lastfm_token")
-    limit = request.args.get("limit")
+    payload = request.get_json()
+    navidrome_server_url = payload.get("navidrome_server_url")
+    navidrome_username = payload.get("navidrome_username")
+    navidrome_password = payload.get("navidrome_password")
+    lastfm_token = payload.get("lastfm_token")
+    limit = payload.get("limit")
 
     try:
         auth_tokens = auth_and_capture_headers(navidrome_server_url, navidrome_username, navidrome_password)
         if not auth_tokens:
             raise Exception("Auth failed, check the navidrome username and password")
         current_favorties = get_current_favorites(navidrome_server_url, auth_tokens)
-        all_similar_tracks = get_all_similar_tracks(current_favorties)
+        all_similar_tracks = get_all_similar_tracks(lastfm_token, current_favorties)
         similar_tracks_sorted = sorted(all_similar_tracks, key=lambda track: int(track.get('playcount', 0)), reverse=True)
         top_tracks = filter_tracks(similar_tracks_sorted, limit)
         return jsonify({'success': True, 'topSongs': top_tracks})
@@ -125,7 +126,7 @@ def get_current_favorites(navidrome_server_url, auth_tokens):
 
 def get_all_similar_tracks(lastfm_api_key, current_favorties):
     similar_tracks = [get_similar_tracks(lastfm_api_key, song.get('artist'), song.get(
-        'title')) for song in navidrome_response if 'artist' in song and 'title' in song]
+        'title')) for song in current_favorties if 'artist' in song and 'title' in song]
     return [track for tracks in similar_tracks for track in tracks]
 
 def filter_tracks(similar_tracks, limit):
